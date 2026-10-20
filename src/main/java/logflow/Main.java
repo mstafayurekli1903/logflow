@@ -1,53 +1,36 @@
 package logflow;
 
-import logflow.model.LogRecord;
-import logflow.pipeline.*;
+import logflow.config.*;
+import logflow.pipeline.Pipeline;
 
 public class Main {
     public static void main(String[] args) {
-        String input = "data/access-small.log";
-        String output = "output.log";
-        Integer minStatus = null;
-        String pathPrefix = null;
-        String[] fields = null;
+        String configFile = null;
 
         for (int i = 0; i < args.length; i++) {
-            if ("--input".equals(args[i]) && i + 1 < args.length) {
-                input = args[++i];
-            } else if ("--output".equals(args[i]) && i + 1 < args.length) {
-                output = args[++i];
-            } else if ("--min-status".equals(args[i]) && i + 1 < args.length) {
-                minStatus = Integer.parseInt(args[++i]);
-            } else if ("--path-prefix".equals(args[i]) && i + 1 < args.length) {
-                pathPrefix = args[++i];
-            } else if ("--fields".equals(args[i]) && i + 1 < args.length) {
-                fields = args[++i].split(",");
+            if ("--config".equals(args[i]) && i + 1 < args.length) {
+                configFile = args[++i];
             }
         }
 
-        FileLineSource source = new FileLineSource(input);
-        FileSink sink = new FileSink(output);
-
-        PipelineBuilder builder = PipelineBuilder.from(source)
-                .via(new ParserStage());
-
-        if (minStatus != null) {
-            int statusLimit = minStatus;
-            builder.via(new PredicateFilterStage(r -> r.status() >= statusLimit));
-        }
-        if (pathPrefix != null) {
-            String prefix = pathPrefix;
-            builder.via(new PredicateFilterStage(r -> r.path().startsWith(prefix)));
-        }
-        if (fields != null) {
-            builder.via(new ProjectionStage(fields));
-        } else {
-            builder.via(new ProjectionStage("timestamp", "clientIp", "status", "path"));
+        if (configFile == null) {
+            System.err.println("Hata: '--config <dosya.yaml>' parametresi zorunludur.");
+            System.exit(1);
         }
 
-        Pipeline pipeline = builder.to(sink);
-        pipeline.execute();
+        try {
+            StageRegistry registry = new StageRegistry();
+            PipelineLoader loader = new PipelineLoader(registry);
 
-        System.out.println("Pipeline basariyla tamamlandi -> " + output);
+            Pipeline pipeline = loader.load(configFile);
+            pipeline.execute();
+            System.out.println("Pipeline basariyla calistirildi: " + configFile);
+        } catch (ConfigurationException e) {
+            System.err.println("YAPILANDIRMA HATASI: " + e.getMessage());
+            System.exit(2);
+        } catch (Exception e) {
+            System.err.println("CALISMA ZAMANI HATASI: " + e.getMessage());
+            System.exit(3);
+        }
     }
 }

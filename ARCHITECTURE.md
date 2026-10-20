@@ -21,3 +21,18 @@ Ham metin ayrıştırılmadan önce `status >= 400` gibi alan bazlı mantıksal 
    - **Dezavantaj:** Filtrenin ihtiyaç duyduğu alan projeksiyonda dışarıda bırakılırsa filtreleme yapılamaz. Ayrıca elenecek kayıtlar için gereksiz yere String işlemleri yapıldığı için performans düşer.
 
 **Sonuç:** İki sıra da mantıksal olarak aynı veri sonucunu üretse de `Filter -> Projection` sırası belirgin bir kaynak tasarrufu sağlar.
+
+## Artım 4 - Yapılandırma Şeması ve Registry Tasarımı
+
+### 1. Yapılandırma Şeması (YAML)
+İşlem hattı topolojisi bildirimsel (declarative) olarak YAML formatında tanımlanır:
+- **pipeline.name**: İşlem hattı tanımı.
+- **source.params.path**: Girdi dosyası yolu.
+- **stages**: Sıralı aşamalar listesi (`type` ve `params`).
+- **sink.params.path**: Çıktı hedef dosyası yolu.
+
+### 2. Registry & Factory Kalıbı
+`StageRegistry` bileşeni, sabit kodlanmış bir `switch` yapısı yerine genişletilebilir bir `Map<String, StageFactory>` yapısına dayanır. Yeni aşamalar sisteme dinamik olarak kaydedilebilir.
+
+### 3. Fail Fast Doğrulama
+Yapılandırma zamanı hataları (eksik parametre, hatalı tip, bilinmeyen aşama), hat başlatılmadan önce `ConfigurationException` ile yakalanır ve erken aşamada kullanıcıya bildirilir.

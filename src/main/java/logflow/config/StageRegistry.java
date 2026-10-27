@@ -1,5 +1,6 @@
 package logflow.config;
 
+import logflow.model.LogRecord;
 import logflow.pipeline.*;
 import java.util.*;
 
@@ -34,6 +35,16 @@ public class StageRegistry {
             return new ParserStage();
         });
 
+        register("validate", params -> {
+            int minStatus = params.containsKey("min_status") ? ((Number) params.get("min_status")).intValue() : 100;
+            int maxStatus = params.containsKey("max_status") ? ((Number) params.get("max_status")).intValue() : 599;
+            long minBytes = params.containsKey("min_bytes") ? ((Number) params.get("min_bytes")).longValue() : 0L;
+            boolean checkIp = !params.containsKey("check_ip") || Boolean.parseBoolean(String.valueOf(params.get("check_ip")));
+            boolean checkTimestamp = !params.containsKey("check_timestamp") || Boolean.parseBoolean(String.valueOf(params.get("check_timestamp")));
+
+            return new ValidationStage(minStatus, maxStatus, minBytes, checkIp, checkTimestamp);
+        });
+
         register("filter", params -> {
             String field = (String) params.get("field");
             String op = (String) params.get("op");
@@ -43,30 +54,36 @@ public class StageRegistry {
                 throw new ConfigurationException("'filter' asamasi icin 'field', 'op' ve 'value' parametreleri zorunludur.");
             }
 
-            return switch (field.toLowerCase()) {
-                case "status" -> {
-                    if (!(value instanceof Number)) {
-                        throw new ConfigurationException("'status' filtresi icin sayisal deger bekleniyor, gelen: " + value);
+            if ("status".equalsIgnoreCase(field)) {
+                if (!(value instanceof Number)) {
+                    throw new ConfigurationException("'status' filtresi icin sayisal deger bekleniyor, gelen: " + value);
+                }
+                int val = ((Number) value).intValue();
+                return (PipelineStage<LogRecord, LogRecord>) (record, emitter) -> {
+                    boolean matches = false;
+                    if (">=".equals(op)) matches = record.status() >= val;
+                    else if ("==".equals(op)) matches = record.status() == val;
+                    else if ("<=".equals(op)) matches = record.status() <= val;
+                    if (matches) {
+                        emitter.emit(record);
                     }
-                    int val = ((Number) value).intValue();
-                    yield new PredicateFilterStage(r -> {
-                        if (">=".equals(op)) return r.status() >= val;
-                        if ("==".equals(op)) return r.status() == val;
-                        if ("<=".equals(op)) return r.status() <= val;
-                        return true;
-                    });
-                }
-                case "path" -> {
-                    String prefix = String.valueOf(value);
-                    yield new PredicateFilterStage(r -> {
-                        if ("startswith".equalsIgnoreCase(op) || "=".equals(op) || "==".equals(op)) {
-                            return r.path().startsWith(prefix);
-                        }
-                        return r.path().contains(prefix);
-                    });
-                }
-                default -> throw new ConfigurationException("Desteklenmeyen filtre alani: " + field);
-            };
+                };
+            } else if ("path".equalsIgnoreCase(field)) {
+                String prefix = String.valueOf(value);
+                return (PipelineStage<LogRecord, LogRecord>) (record, emitter) -> {
+                    boolean matches;
+                    if ("startswith".equalsIgnoreCase(op) || "=".equals(op) || "==".equals(op)) {
+                        matches = record.path().startsWith(prefix);
+                    } else {
+                        matches = record.path().contains(prefix);
+                    }
+                    if (matches) {
+                        emitter.emit(record);
+                    }
+                };
+            } else {
+                throw new ConfigurationException("Desteklenmeyen filtre alani: " + field);
+            }
         });
 
         register("project", params -> {
@@ -78,7 +95,21 @@ public class StageRegistry {
                 throw new ConfigurationException("'fields' parametresi liste tipinde olmalidir.");
             }
             String[] fieldArray = list.stream().map(Object::toString).toArray(String[]::new);
-            return new ProjectionStage(fieldArray);
+            return (PipelineStage<LogRecord, String>) (record, emitter) -> {
+                List<String> values = new ArrayList<>();
+                for (String f : fieldArray) {
+                    switch (f.toLowerCase()) {
+                        case "timestamp" -> values.add(record.timestamp().toString());
+                        case "clientip", "ip" -> values.add(record.clientIp());
+                        case "method" -> values.add(record.method());
+                        case "path" -> values.add(record.path());
+                        case "status" -> values.add(String.valueOf(record.status()));
+                        case "bytes" -> values.add(String.valueOf(record.bytes()));
+                        default -> values.add("");
+                    }
+                }
+                emitter.emit(String.join(" | ", values));
+            };
         });
     }
 }

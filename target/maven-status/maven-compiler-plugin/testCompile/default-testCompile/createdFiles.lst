@@ -1,0 +1,5 @@
+logflow\config\Increment4Test.class
+logflow\pipeline\Increment3Test.class
+logflow\pipeline\CollectingEmitter.class
+logflow\pipeline\ParserStageTest.class
+logflow\Increment5Test.class

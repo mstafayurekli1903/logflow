@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="tr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ParserStage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">logflow</a> &gt; <a href="index.source.html" class="el_package">logflow.pipeline</a> &gt; <span class="el_source">ParserStage.java</span></div><h1>ParserStage.java</h1><pre class="source lang-java linenums">package logflow.pipeline;
+
+import logflow.error.StageException;
+import logflow.model.LogRecord;
+
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class ParserStage implements PipelineStage&lt;String, LogRecord&gt; {
+    private static final String CLF_REGEX = &quot;^(\\S+) (?:\\S+) (?:\\S+) \\[([\\w:/]+\\s[+\\-]\\d{4})\\] \&quot;(\\S+)\\s?(\\S+)?\\s?(\\S+)?\&quot; (\\d{3}|-) (\\d+|-)(?:\\s+\&quot;([^\&quot;]*)\&quot;\\s+\&quot;([^\&quot;]*)\&quot;)?$&quot;;
+<span class="fc" id="L15">    private static final Pattern CLF_PATTERN = Pattern.compile(CLF_REGEX);</span>
+<span class="fc" id="L16">    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(&quot;dd/MMM/yyyy:HH:mm:ss Z&quot;, Locale.ENGLISH);</span>
+
+<span class="pc" id="L18">    private long malformedCount = 0;</span>
+<span class="pc" id="L19">    private boolean throwOnMalformed = false;</span>
+
+<span class="fc" id="L21">    public ParserStage() {}</span>
+
+<span class="nc" id="L23">    public ParserStage(boolean throwOnMalformed) {</span>
+<span class="nc" id="L24">        this.throwOnMalformed = throwOnMalformed;</span>
+<span class="nc" id="L25">    }</span>
+
+    public long getMalformedCount() {
+<span class="fc" id="L28">        return malformedCount;</span>
+    }
+
+    public void setThrowOnMalformed(boolean throwOnMalformed) {
+<span class="fc" id="L32">        this.throwOnMalformed = throwOnMalformed;</span>
+<span class="fc" id="L33">    }</span>
+
+    @Override
+    public void process(String input, Emitter&lt;LogRecord&gt; emitter) {
+<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if (input == null || input.isBlank()) {</span>
+<span class="fc" id="L38">            malformedCount++;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (throwOnMalformed) {</span>
+<span class="nc" id="L40">                throw new StageException(&quot;Bos veya tanimsiz log satiri.&quot;);</span>
+            }
+<span class="fc" id="L42">            return;</span>
+        }
+
+<span class="fc" id="L45">        Matcher matcher = CLF_PATTERN.matcher(input.trim());</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (!matcher.matches()) {</span>
+<span class="fc" id="L47">            malformedCount++;</span>
+<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (throwOnMalformed) {</span>
+<span class="fc" id="L49">                throw new StageException(&quot;CLF formatina uymayan log satiri: &quot; + input);</span>
+            }
+<span class="fc" id="L51">            return;</span>
+        }
+
+        try {
+<span class="fc" id="L55">            String clientIp = matcher.group(1);</span>
+<span class="fc" id="L56">            Instant timestamp = Instant.from(DATE_FORMATTER.parse(matcher.group(2)));</span>
+<span class="fc" id="L57">            String method = matcher.group(3);</span>
+<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            String path = matcher.group(4) != null ? matcher.group(4) : &quot;&quot;;</span>
+<span class="fc" id="L59">            int status = Integer.parseInt(matcher.group(6));</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            long bytes = &quot;-&quot;.equals(matcher.group(7)) ? 0L : Long.parseLong(matcher.group(7));</span>
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            String userAgent = matcher.group(9) != null ? matcher.group(9) : &quot;&quot;;</span>
+
+<span class="fc" id="L63">            LogRecord record = new LogRecord(timestamp, clientIp, method, path, status, bytes, userAgent, Collections.emptyMap(), input);</span>
+<span class="fc" id="L64">            emitter.emit(record);</span>
+<span class="nc" id="L65">        } catch (StageException se) {</span>
+<span class="nc" id="L66">            throw se;</span>
+<span class="nc" id="L67">        } catch (Exception e) {</span>
+<span class="nc" id="L68">            malformedCount++;</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            if (throwOnMalformed) {</span>
+<span class="nc" id="L70">                throw new StageException(&quot;Ayristirma hatasi: &quot; + e.getMessage(), e);</span>
+            }
+<span class="fc" id="L72">        }</span>
+<span class="fc" id="L73">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

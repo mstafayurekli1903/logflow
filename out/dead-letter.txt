@@ -1,0 +1,6 @@
+[2026-10-27T11:14:25.580986200Z] [STAGE: parse] [ERROR: CLF formatina uymayan log satiri: BU_KESILMIS_BOZUK_BIR_LOG_SATIRIDIR] RAW: BU_KESILMIS_BOZUK_BIR_LOG_SATIRIDIR
+[2026-10-27T11:14:25.580986200Z] [STAGE: validate] [ERROR: Gecersiz zaman damgasi mantigi (1990-2030 disi): 1970-01-01T00:00:01Z] RAW: 192.168.1.50 - - [01/Jan/1970:00:00:01 +0000] "GET /old HTTP/1.1" 200 512
+[2026-10-27T11:14:25.580986200Z] [STAGE: validate] [ERROR: Gecersiz zaman damgasi mantigi (1990-2030 disi): 2099-12-31T23:59:59Z] RAW: 192.168.1.60 - - [31/Dec/2099:23:59:59 +0000] "GET /future HTTP/1.1" 200 512
+[2026-10-27T11:14:25.581984400Z] [STAGE: validate] [ERROR: Gecersiz IP adresi formati: 999.999.999.999] RAW: 999.999.999.999 - - [20/Oct/2026:12:00:00 +0000] "GET /badip HTTP/1.1" 200 512
+[2026-10-27T11:14:25.581984400Z] [STAGE: parse] [ERROR: CLF formatina uymayan log satiri: 192.168.1.70 - - [20/Oct/2026:12:05:00 +0000] "GET /negative HTTP/1.1" 200 -500] RAW: 192.168.1.70 - - [20/Oct/2026:12:05:00 +0000] "GET /negative HTTP/1.1" 200 -500
+[2026-10-27T11:14:25.581984400Z] [STAGE: validate] [ERROR: Gecersiz HTTP durum kodu: 999 (100-599 araliginda olmali)] RAW: 192.168.1.80 - - [20/Oct/2026:12:10:00 +0000] "GET /badstatus HTTP/1.1" 999 1024

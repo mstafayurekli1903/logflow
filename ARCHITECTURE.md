@@ -36,3 +36,32 @@ Ham metin ayrıştırılmadan önce `status >= 400` gibi alan bazlı mantıksal 
 
 ### 3. Fail Fast Doğrulama
 Yapılandırma zamanı hataları (eksik parametre, hatalı tip, bilinmeyen aşama), hat başlatılmadan önce `ConfigurationException` ile yakalanır ve erken aşamada kullanıcıya bildirilir.
+
+## Artırım 5 - Hata Yönetimi, Doğrulama ve Dead-Letter Mimarisi
+
+### 1. Hata Modeli ve Sorumluluk Ayrımı
+- StageException (Kurtarılabilir / Kayıt Düzeyi): Tek bir log kaydının ayrıştırılması veya doğrulanması sırasında oluşan veri hatasıdır. Pipeline durdurulmaz; kaydın belirlenen politikasına (SKIP, DEAD_LETTER) göre ikincil kanala aktarılır veya atlanır.
+- PipelineException (Kurtarılamaz / Sistem Düzeyi): Hatalı YAML konfigürasyonu, erişilemeyen kaynak dosya, dolan disk veya FAIL_FAST politikasının tetiklenmesi durumlarında işlem hattının güvenli bir şekilde derhal durmasını sağlar.
+
+### 2. İkincil Kanal ve Topoloji (Dead-Letter Channel)
+İşlem hattı artık düz bir çizgi değildir; hatalı kayıtlar ana akıştan izole edilerek ikincil bir boru hattına yönlendirilir:
+
+[FileLineSource] -> [ParserStage] -(hata)-> [DeadLetterSink (out/dead-letter.txt)]
+                         | (başarılı)
+                 [ValidationStage] -(hata)-> [DeadLetterSink (out/dead-letter.txt)]
+                         | (geçerli)
+                   [FilterStage]
+                         |
+                  [ProjectStage]
+                         |
+                    [FileSink (out/clean-output.txt)]
+
+### 3. Kaos Testi: Bozuk Veri Türleri ve Ele Alan Politikalar Tablosu
+
+| Bozuk Veri Örneği | Oluşan Hata | Tespit Eden Aşama | Uygulanan Politika | Yönlendirilen Hedef |
+| :--- | :--- | :--- | :--- | :--- |
+| BU_KESILMIS_BOZUK_BIR_LOG_SATIRIDIR | CLF format uyumsuzluğu | ParserStage | DEAD_LETTER | out/dead-letter.txt |
+| 01/Jan/1970 veya 31/Dec/2099 | 1990-2030 dışı mantıksız tarih | ValidationStage | DEAD_LETTER | out/dead-letter.txt |
+| 999.999.999.999 | Geçersiz IPv4 formatı | ValidationStage | DEAD_LETTER | out/dead-letter.txt |
+| bytes: -500 | Negatif veri boyutu | ValidationStage | DEAD_LETTER | out/dead-letter.txt |
+| status: 999 | HTTP durum kodu (100-599 dışı) | ValidationStage | DEAD_LETTER | out/dead-letter.txt |

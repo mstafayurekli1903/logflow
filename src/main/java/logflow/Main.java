@@ -1,6 +1,7 @@
 package logflow;
 
 import logflow.config.*;
+import logflow.error.RunSummary;
 import logflow.pipeline.Pipeline;
 
 public class Main {
@@ -23,8 +24,8 @@ public class Main {
             PipelineLoader loader = new PipelineLoader(registry);
 
             Pipeline pipeline = loader.load(configFile);
-            pipeline.execute();
-            System.out.println("Pipeline basariyla calistirildi: " + configFile);
+            RunSummary summary = pipeline.execute();
+            summary.printReport();
         } catch (ConfigurationException e) {
             System.err.println("YAPILANDIRMA HATASI: " + e.getMessage());
             System.exit(2);

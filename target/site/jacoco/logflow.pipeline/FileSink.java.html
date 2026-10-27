@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="tr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FileSink.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">logflow</a> &gt; <a href="index.source.html" class="el_package">logflow.pipeline</a> &gt; <span class="el_source">FileSink.java</span></div><h1>FileSink.java</h1><pre class="source lang-java linenums">package logflow.pipeline;
+
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
+
+public class FileSink implements AutoCloseable {
+    private final String outputPath;
+    private BufferedWriter writer;
+
+<span class="fc" id="L11">    public FileSink(String outputPath) {</span>
+<span class="fc" id="L12">        this.outputPath = outputPath;</span>
+<span class="fc" id="L13">    }</span>
+
+    public void open() {
+        try {
+<span class="fc" id="L17">            this.writer = new BufferedWriter(new FileWriter(outputPath));</span>
+<span class="nc" id="L18">        } catch (IOException e) {</span>
+<span class="nc" id="L19">            throw new RuntimeException(&quot;Cikti dosyasi acilamadi: &quot; + outputPath, e);</span>
+<span class="fc" id="L20">        }</span>
+<span class="fc" id="L21">    }</span>
+
+    public void consume(Object item) {
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">        if (item == null || writer == null) return;</span>
+        try {
+<span class="fc" id="L26">            writer.write(item.toString());</span>
+<span class="fc" id="L27">            writer.newLine();</span>
+<span class="nc" id="L28">        } catch (IOException e) {</span>
+<span class="nc" id="L29">            throw new RuntimeException(&quot;Yazma hatasi&quot;, e);</span>
+<span class="fc" id="L30">        }</span>
+<span class="fc" id="L31">    }</span>
+
+    @Override
+    public void close() {
+<span class="pc bpc" id="L35" title="1 of 2 branches missed.">        if (writer != null) {</span>
+            try {
+<span class="fc" id="L37">                writer.flush();</span>
+<span class="fc" id="L38">                writer.close();</span>
+<span class="pc" id="L39">            } catch (IOException ignored) {}</span>
+        }
+<span class="fc" id="L41">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

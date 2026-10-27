@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="tr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StageRegistry.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">logflow</a> &gt; <a href="index.source.html" class="el_package">logflow.config</a> &gt; <span class="el_source">StageRegistry.java</span></div><h1>StageRegistry.java</h1><pre class="source lang-java linenums">package logflow.config;
+
+import logflow.model.LogRecord;
+import logflow.pipeline.*;
+import java.util.*;
+
+public class StageRegistry {
+<span class="fc" id="L8">    private final Map&lt;String, StageFactory&gt; registry = new HashMap&lt;&gt;();</span>
+
+<span class="fc" id="L10">    public StageRegistry() {</span>
+<span class="fc" id="L11">        registerDefaults();</span>
+<span class="fc" id="L12">    }</span>
+
+    public void register(String type, StageFactory factory) {
+<span class="fc" id="L15">        registry.put(type.toLowerCase(), factory);</span>
+<span class="fc" id="L16">    }</span>
+
+    public StageFactory get(String type) {
+<span class="fc" id="L19">        StageFactory factory = registry.get(type.toLowerCase());</span>
+<span class="fc bfc" id="L20" title="All 2 branches covered.">        if (factory == null) {</span>
+<span class="fc" id="L21">            throw new ConfigurationException(&quot;Bilinmeyen asama turu: '&quot; + type + &quot;'. Kayitli asamalar: &quot; + registry.keySet());</span>
+        }
+<span class="fc" id="L23">        return factory;</span>
+    }
+
+    private void registerDefaults() {
+<span class="fc" id="L27">        register(&quot;parse&quot;, params -&gt; {</span>
+<span class="fc" id="L28">            String format = (String) params.get(&quot;format&quot;);</span>
+<span class="pc bpc" id="L29" title="1 of 4 branches missed.">            if (format == null || format.isBlank()) {</span>
+<span class="fc" id="L30">                throw new ConfigurationException(&quot;'parse' asamasi icin 'format' parametresi zorunludur.&quot;);</span>
+            }
+<span class="pc bpc" id="L32" title="1 of 2 branches missed.">            if (!&quot;clf&quot;.equalsIgnoreCase(format)) {</span>
+<span class="nc" id="L33">                throw new ConfigurationException(&quot;Desteklenmeyen log formati: '&quot; + format + &quot;'. Sadece 'clf' desteklenir.&quot;);</span>
+            }
+<span class="fc" id="L35">            return new ParserStage();</span>
+        });
+
+<span class="fc" id="L38">        register(&quot;validate&quot;, params -&gt; {</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            int minStatus = params.containsKey(&quot;min_status&quot;) ? ((Number) params.get(&quot;min_status&quot;)).intValue() : 100;</span>
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">            int maxStatus = params.containsKey(&quot;max_status&quot;) ? ((Number) params.get(&quot;max_status&quot;)).intValue() : 599;</span>
+<span class="pc bpc" id="L41" title="1 of 2 branches missed.">            long minBytes = params.containsKey(&quot;min_bytes&quot;) ? ((Number) params.get(&quot;min_bytes&quot;)).longValue() : 0L;</span>
+<span class="pc bpc" id="L42" title="3 of 4 branches missed.">            boolean checkIp = !params.containsKey(&quot;check_ip&quot;) || Boolean.parseBoolean(String.valueOf(params.get(&quot;check_ip&quot;)));</span>
+<span class="pc bpc" id="L43" title="3 of 4 branches missed.">            boolean checkTimestamp = !params.containsKey(&quot;check_timestamp&quot;) || Boolean.parseBoolean(String.valueOf(params.get(&quot;check_timestamp&quot;)));</span>
+
+<span class="fc" id="L45">            return new ValidationStage(minStatus, maxStatus, minBytes, checkIp, checkTimestamp);</span>
+        });
+
+<span class="fc" id="L48">        register(&quot;filter&quot;, params -&gt; {</span>
+<span class="fc" id="L49">            String field = (String) params.get(&quot;field&quot;);</span>
+<span class="fc" id="L50">            String op = (String) params.get(&quot;op&quot;);</span>
+<span class="fc" id="L51">            Object value = params.get(&quot;value&quot;);</span>
+
+<span class="pc bpc" id="L53" title="3 of 6 branches missed.">            if (field == null || op == null || value == null) {</span>
+<span class="nc" id="L54">                throw new ConfigurationException(&quot;'filter' asamasi icin 'field', 'op' ve 'value' parametreleri zorunludur.&quot;);</span>
+            }
+
+<span class="pc bpc" id="L57" title="1 of 2 branches missed.">            if (&quot;status&quot;.equalsIgnoreCase(field)) {</span>
+<span class="fc bfc" id="L58" title="All 2 branches covered.">                if (!(value instanceof Number)) {</span>
+<span class="fc" id="L59">                    throw new ConfigurationException(&quot;'status' filtresi icin sayisal deger bekleniyor, gelen: &quot; + value);</span>
+                }
+<span class="fc" id="L61">                int val = ((Number) value).intValue();</span>
+<span class="fc" id="L62">                return (PipelineStage&lt;LogRecord, LogRecord&gt;) (record, emitter) -&gt; {</span>
+<span class="nc" id="L63">                    boolean matches = false;</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">                    if (&quot;&gt;=&quot;.equals(op)) matches = record.status() &gt;= val;</span>
+<span class="nc bnc" id="L65" title="All 4 branches missed.">                    else if (&quot;==&quot;.equals(op)) matches = record.status() == val;</span>
+<span class="nc bnc" id="L66" title="All 4 branches missed.">                    else if (&quot;&lt;=&quot;.equals(op)) matches = record.status() &lt;= val;</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">                    if (matches) {</span>
+<span class="nc" id="L68">                        emitter.emit(record);</span>
+                    }
+<span class="nc" id="L70">                };</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">            } else if (&quot;path&quot;.equalsIgnoreCase(field)) {</span>
+<span class="nc" id="L72">                String prefix = String.valueOf(value);</span>
+<span class="nc" id="L73">                return (PipelineStage&lt;LogRecord, LogRecord&gt;) (record, emitter) -&gt; {</span>
+                    boolean matches;
+<span class="nc bnc" id="L75" title="All 6 branches missed.">                    if (&quot;startswith&quot;.equalsIgnoreCase(op) || &quot;=&quot;.equals(op) || &quot;==&quot;.equals(op)) {</span>
+<span class="nc" id="L76">                        matches = record.path().startsWith(prefix);</span>
+                    } else {
+<span class="nc" id="L78">                        matches = record.path().contains(prefix);</span>
+                    }
+<span class="nc bnc" id="L80" title="All 2 branches missed.">                    if (matches) {</span>
+<span class="nc" id="L81">                        emitter.emit(record);</span>
+                    }
+<span class="nc" id="L83">                };</span>
+            } else {
+<span class="nc" id="L85">                throw new ConfigurationException(&quot;Desteklenmeyen filtre alani: &quot; + field);</span>
+            }
+        });
+
+<span class="fc" id="L89">        register(&quot;project&quot;, params -&gt; {</span>
+<span class="fc" id="L90">            Object rawFields = params.get(&quot;fields&quot;);</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (rawFields == null) {</span>
+<span class="nc" id="L92">                throw new ConfigurationException(&quot;'project' asamasi icin 'fields' listesi zorunludur.&quot;);</span>
+            }
+<span class="pc bpc" id="L94" title="1 of 2 branches missed.">            if (!(rawFields instanceof List&lt;?&gt; list)) {</span>
+<span class="nc" id="L95">                throw new ConfigurationException(&quot;'fields' parametresi liste tipinde olmalidir.&quot;);</span>
+            }
+<span class="fc" id="L97">            String[] fieldArray = list.stream().map(Object::toString).toArray(String[]::new);</span>
+<span class="fc" id="L98">            return (PipelineStage&lt;LogRecord, String&gt;) (record, emitter) -&gt; {</span>
+<span class="nc" id="L99">                List&lt;String&gt; values = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">                for (String f : fieldArray) {</span>
+<span class="nc bnc" id="L101" title="All 7 branches missed.">                    switch (f.toLowerCase()) {</span>
+<span class="nc" id="L102">                        case &quot;timestamp&quot; -&gt; values.add(record.timestamp().toString());</span>
+<span class="nc" id="L103">                        case &quot;clientip&quot;, &quot;ip&quot; -&gt; values.add(record.clientIp());</span>
+<span class="nc" id="L104">                        case &quot;method&quot; -&gt; values.add(record.method());</span>
+<span class="nc" id="L105">                        case &quot;path&quot; -&gt; values.add(record.path());</span>
+<span class="nc" id="L106">                        case &quot;status&quot; -&gt; values.add(String.valueOf(record.status()));</span>
+<span class="nc" id="L107">                        case &quot;bytes&quot; -&gt; values.add(String.valueOf(record.bytes()));</span>
+<span class="nc" id="L108">                        default -&gt; values.add(&quot;&quot;);</span>
+                    }
+                }
+<span class="nc" id="L111">                emitter.emit(String.join(&quot; | &quot;, values));</span>
+<span class="nc" id="L112">            };</span>
+        });
+<span class="fc" id="L114">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

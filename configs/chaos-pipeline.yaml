@@ -1,0 +1,24 @@
+pipeline:
+  name: resilient-pipeline
+  source:
+    type: file
+    params: { path: data/access-dirty.log }
+  dead_letter:
+    type: file
+    params: { path: out/dead-letter.txt }
+  stages:
+    - type: parse
+      params: { format: clf }
+      on_error: DEAD_LETTER
+    - type: validate
+      params: { min_status: 100, max_status: 599, min_bytes: 0, check_ip: true, check_timestamp: true }
+      on_error: DEAD_LETTER
+    - type: filter
+      params: { field: status, op: ">=", value: 200 }
+      on_error: FAIL_FAST
+    - type: project
+      params: { fields: [timestamp, clientip, status, path] }
+      on_error: FAIL_FAST
+  sink:
+    type: file
+    params: { path: out/clean-output.txt }

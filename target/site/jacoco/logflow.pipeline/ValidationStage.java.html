@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="tr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ValidationStage.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">logflow</a> &gt; <a href="index.source.html" class="el_package">logflow.pipeline</a> &gt; <span class="el_source">ValidationStage.java</span></div><h1>ValidationStage.java</h1><pre class="source lang-java linenums">package logflow.pipeline;
+
+import logflow.error.StageException;
+import logflow.model.LogRecord;
+
+import java.time.Instant;
+
+public class ValidationStage implements PipelineStage&lt;LogRecord, LogRecord&gt; {
+    private final int minStatus;
+    private final int maxStatus;
+    private final long minBytes;
+    private final boolean checkIp;
+    private final boolean checkTimestamp;
+
+<span class="fc" id="L15">    public ValidationStage(int minStatus, int maxStatus, long minBytes, boolean checkIp, boolean checkTimestamp) {</span>
+<span class="fc" id="L16">        this.minStatus = minStatus;</span>
+<span class="fc" id="L17">        this.maxStatus = maxStatus;</span>
+<span class="fc" id="L18">        this.minBytes = minBytes;</span>
+<span class="fc" id="L19">        this.checkIp = checkIp;</span>
+<span class="fc" id="L20">        this.checkTimestamp = checkTimestamp;</span>
+<span class="fc" id="L21">    }</span>
+
+    private boolean isValidIpv4(String ip) {
+<span class="pc bpc" id="L24" title="2 of 4 branches missed.">        if (ip == null || ip.isBlank()) return false;</span>
+<span class="fc" id="L25">        String[] parts = ip.split(&quot;\\.&quot;);</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        if (parts.length != 4) return false;</span>
+        try {
+<span class="fc bfc" id="L28" title="All 2 branches covered.">            for (String p : parts) {</span>
+<span class="fc" id="L29">                int octet = Integer.parseInt(p);</span>
+<span class="pc bpc" id="L30" title="2 of 4 branches missed.">                if (octet &lt; 0 || octet &gt; 255) return false;</span>
+            }
+<span class="fc" id="L32">            return true;</span>
+<span class="nc" id="L33">        } catch (NumberFormatException e) {</span>
+<span class="nc" id="L34">            return false;</span>
+        }
+    }
+
+    @Override
+    public void process(LogRecord record, Emitter&lt;LogRecord&gt; emitter) {
+<span class="pc bpc" id="L40" title="1 of 2 branches missed.">        if (record == null) {</span>
+<span class="nc" id="L41">            throw new StageException(&quot;Kayit null olamaz.&quot;);</span>
+        }
+
+<span class="pc bpc" id="L44" title="2 of 4 branches missed.">        if (record.status() &lt; minStatus || record.status() &gt; maxStatus) {</span>
+<span class="nc" id="L45">            throw new StageException(String.format(&quot;Gecersiz HTTP durum kodu: %d (%d-%d araliginda olmali)&quot;,</span>
+<span class="nc" id="L46">                    record.status(), minStatus, maxStatus));</span>
+        }
+
+<span class="pc bpc" id="L49" title="1 of 2 branches missed.">        if (record.bytes() &lt; minBytes) {</span>
+<span class="nc" id="L50">            throw new StageException(&quot;Negatif veya gecersiz byte boyutu: &quot; + record.bytes());</span>
+        }
+
+<span class="pc bpc" id="L53" title="1 of 2 branches missed.">        if (checkIp) {</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (!isValidIpv4(record.clientIp())) {</span>
+<span class="nc" id="L55">                throw new StageException(&quot;Gecersiz IP adresi formati: &quot; + record.clientIp());</span>
+            }
+        }
+
+<span class="pc bpc" id="L59" title="2 of 4 branches missed.">        if (checkTimestamp &amp;&amp; record.timestamp() != null) {</span>
+<span class="fc" id="L60">            Instant minTime = Instant.parse(&quot;1990-01-01T00:00:00Z&quot;);</span>
+<span class="fc" id="L61">            Instant maxTime = Instant.parse(&quot;2030-01-01T00:00:00Z&quot;);</span>
+<span class="pc bpc" id="L62" title="2 of 4 branches missed.">            if (record.timestamp().isBefore(minTime) || record.timestamp().isAfter(maxTime)) {</span>
+<span class="nc" id="L63">                throw new StageException(&quot;Gecersiz zaman damgasi mantigi (1990-2030 disi): &quot; + record.timestamp());</span>
+            }
+        }
+
+<span class="fc" id="L67">        emitter.emit(record);</span>
+<span class="fc" id="L68">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

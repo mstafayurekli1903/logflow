@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="tr"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Pipeline.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">logflow</a> &gt; <a href="index.source.html" class="el_package">logflow.pipeline</a> &gt; <span class="el_source">Pipeline.java</span></div><h1>Pipeline.java</h1><pre class="source lang-java linenums">package logflow.pipeline;
+
+import logflow.error.*;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+public class Pipeline {
+    private final FileLineSource source;
+    private final List&lt;PipelineStageWrapper&gt; stages;
+    private final FileSink sink;
+    private final DeadLetterSink deadLetterSink;
+    private final RunSummary summary;
+
+    public Pipeline(FileLineSource source,
+                    List&lt;PipelineStageWrapper&gt; stages,
+                    FileSink sink,
+                    DeadLetterSink deadLetterSink,
+<span class="fc" id="L21">                    RunSummary summary) {</span>
+<span class="fc" id="L22">        this.source = source;</span>
+<span class="fc" id="L23">        this.stages = stages;</span>
+<span class="fc" id="L24">        this.sink = sink;</span>
+<span class="fc" id="L25">        this.deadLetterSink = deadLetterSink;</span>
+<span class="pc bpc" id="L26" title="1 of 2 branches missed.">        this.summary = summary != null ? summary : new RunSummary();</span>
+<span class="fc" id="L27">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L30">    public Pipeline(FileLineSource source, List&lt;PipelineStage&lt;?, ?&gt;&gt; oldStages, FileSink sink) {</span>
+<span class="fc" id="L31">        this.source = source;</span>
+<span class="fc" id="L32">        this.sink = sink;</span>
+<span class="fc" id="L33">        this.deadLetterSink = null;</span>
+<span class="fc" id="L34">        this.summary = new RunSummary();</span>
+<span class="fc" id="L35">        this.stages = new ArrayList&lt;&gt;();</span>
+<span class="pc bpc" id="L36" title="1 of 2 branches missed.">        if (oldStages != null) {</span>
+<span class="fc bfc" id="L37" title="All 2 branches covered.">            for (PipelineStage&lt;?, ?&gt; s : oldStages) {</span>
+<span class="fc" id="L38">                this.stages.add(new PipelineStageWrapper(s.getClass().getSimpleName(), s, ErrorPolicy.SKIP));</span>
+<span class="fc" id="L39">            }</span>
+        }
+<span class="fc" id="L41">    }</span>
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public RunSummary execute() {
+<span class="fc" id="L45">        summary.start();</span>
+        try {
+<span class="fc" id="L47">            source.open();</span>
+<span class="fc" id="L48">            sink.open();</span>
+<span class="fc bfc" id="L49" title="All 2 branches covered.">            if (deadLetterSink != null) {</span>
+<span class="fc" id="L50">                deadLetterSink.open();</span>
+            }
+
+<span class="fc bfc" id="L53" title="All 2 branches covered.">            for (PipelineStageWrapper w : stages) {</span>
+<span class="fc" id="L54">                Object stageObj = w.getStage();</span>
+<span class="fc bfc" id="L55" title="All 2 branches covered.">                if (stageObj instanceof ParserStage ps) {</span>
+<span class="fc" id="L56">                    ps.setThrowOnMalformed(true);</span>
+                }
+<span class="fc" id="L58">            }</span>
+
+            String rawLine;
+<span class="fc bfc" id="L61" title="All 2 branches covered.">            while ((rawLine = source.nextLine()) != null) {</span>
+<span class="fc" id="L62">                summary.incrementIn();</span>
+
+<span class="fc" id="L64">                List&lt;Object&gt; currentBatch = new ArrayList&lt;&gt;(Collections.singletonList(rawLine));</span>
+<span class="fc" id="L65">                boolean droppedToDeadLetterOrSkip = false;</span>
+
+<span class="fc bfc" id="L67" title="All 2 branches covered.">                for (PipelineStageWrapper wrapper : stages) {</span>
+<span class="fc" id="L68">                    List&lt;Object&gt; nextBatch = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L69">                    PipelineStage&lt;Object, Object&gt; stage = wrapper.getStage();</span>
+<span class="fc" id="L70">                    Emitter&lt;Object&gt; emitter = nextBatch::add;</span>
+
+<span class="fc bfc" id="L72" title="All 2 branches covered.">                    for (Object item : currentBatch) {</span>
+                        try {
+<span class="fc" id="L74">                            stage.process(item, emitter);</span>
+<span class="fc" id="L75">                        } catch (Exception ex) {</span>
+<span class="fc" id="L76">                            droppedToDeadLetterOrSkip = true;</span>
+<span class="fc" id="L77">                            ErrorPolicy policy = wrapper.getErrorPolicy();</span>
+
+<span class="fc bfc" id="L79" title="All 2 branches covered.">                            if (policy == ErrorPolicy.FAIL_FAST) {</span>
+<span class="fc" id="L80">                                throw new PipelineException(&quot;FAIL_FAST politikasi tetiklendi! Asama: &quot; + wrapper.getName()</span>
+<span class="fc" id="L81">                                        + &quot; Hata: &quot; + ex.getMessage(), ex);</span>
+<span class="fc bfc" id="L82" title="All 2 branches covered.">                            } else if (policy == ErrorPolicy.SKIP) {</span>
+<span class="fc" id="L83">                                summary.incrementSkipped(wrapper.getName());</span>
+<span class="pc bpc" id="L84" title="1 of 2 branches missed.">                            } else if (policy == ErrorPolicy.DEAD_LETTER) {</span>
+<span class="fc" id="L85">                                summary.incrementDeadLetter();</span>
+<span class="pc bpc" id="L86" title="1 of 2 branches missed.">                                if (deadLetterSink != null) {</span>
+<span class="fc" id="L87">                                    FailedRecord failed = new FailedRecord(</span>
+                                            rawLine,
+<span class="fc" id="L89">                                            wrapper.getName(),</span>
+<span class="pc bpc" id="L90" title="1 of 2 branches missed.">                                            ex.getMessage() != null ? ex.getMessage() : ex.getClass().getSimpleName(),</span>
+<span class="fc" id="L91">                                            Instant.now()</span>
+                                    );
+<span class="fc" id="L93">                                    deadLetterSink.write(failed);</span>
+                                }
+                            }
+<span class="fc" id="L96">                            break;</span>
+<span class="fc" id="L97">                        }</span>
+<span class="fc" id="L98">                    }</span>
+
+<span class="fc bfc" id="L100" title="All 2 branches covered.">                    if (droppedToDeadLetterOrSkip) {</span>
+<span class="fc" id="L101">                        break;</span>
+                    }
+<span class="fc" id="L103">                    currentBatch = nextBatch;</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">                    if (currentBatch.isEmpty()) {</span>
+<span class="fc" id="L105">                        break;</span>
+                    }
+<span class="fc" id="L107">                }</span>
+
+<span class="fc bfc" id="L109" title="All 2 branches covered.">                if (!droppedToDeadLetterOrSkip) {</span>
+<span class="fc bfc" id="L110" title="All 2 branches covered.">                    for (Object outItem : currentBatch) {</span>
+<span class="fc" id="L111">                        sink.consume(outItem.toString());</span>
+<span class="fc" id="L112">                        summary.incrementOut();</span>
+<span class="fc" id="L113">                    }</span>
+                }
+<span class="fc" id="L115">            }</span>
+<span class="fc" id="L116">        } catch (PipelineException pe) {</span>
+<span class="fc" id="L117">            throw pe;</span>
+<span class="nc" id="L118">        } catch (Exception e) {</span>
+<span class="nc" id="L119">            throw new PipelineException(&quot;Islem hatti yurutulurken hata: &quot; + e.getMessage(), e);</span>
+        } finally {
+<span class="fc" id="L121">            summary.stop();</span>
+<span class="pc" id="L122">            try { source.close(); } catch (Exception ignored) {}</span>
+<span class="pc" id="L123">            try { sink.close(); } catch (Exception ignored) {}</span>
+<span class="pc bfc" id="L124" title="All 2 branches covered.">            try { if (deadLetterSink != null) deadLetterSink.close(); } catch (Exception ignored) {}</span>
+        }
+<span class="fc" id="L126">        return summary;</span>
+    }
+
+    public RunSummary getSummary() {
+<span class="nc" id="L130">        return summary;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

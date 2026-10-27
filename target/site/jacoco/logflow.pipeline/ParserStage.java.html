@@ -15,61 +15,92 @@ public class ParserStage implements PipelineStage&lt;String, LogRecord&gt; {
 <span class="fc" id="L15">    private static final Pattern CLF_PATTERN = Pattern.compile(CLF_REGEX);</span>
 <span class="fc" id="L16">    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern(&quot;dd/MMM/yyyy:HH:mm:ss Z&quot;, Locale.ENGLISH);</span>
 
-<span class="pc" id="L18">    private long malformedCount = 0;</span>
-<span class="pc" id="L19">    private boolean throwOnMalformed = false;</span>
+    private static final int MAX_LINE_LENGTH = 16384;
 
-<span class="fc" id="L21">    public ParserStage() {}</span>
+<span class="pc" id="L20">    private long malformedCount = 0;</span>
+<span class="pc" id="L21">    private boolean throwOnMalformed = false;</span>
 
-<span class="nc" id="L23">    public ParserStage(boolean throwOnMalformed) {</span>
-<span class="nc" id="L24">        this.throwOnMalformed = throwOnMalformed;</span>
-<span class="nc" id="L25">    }</span>
+<span class="fc" id="L23">    public ParserStage() {}</span>
+
+<span class="nc" id="L25">    public ParserStage(boolean throwOnMalformed) {</span>
+<span class="nc" id="L26">        this.throwOnMalformed = throwOnMalformed;</span>
+<span class="nc" id="L27">    }</span>
 
     public long getMalformedCount() {
-<span class="fc" id="L28">        return malformedCount;</span>
+<span class="fc" id="L30">        return malformedCount;</span>
     }
 
     public void setThrowOnMalformed(boolean throwOnMalformed) {
-<span class="fc" id="L32">        this.throwOnMalformed = throwOnMalformed;</span>
-<span class="fc" id="L33">    }</span>
+<span class="fc" id="L34">        this.throwOnMalformed = throwOnMalformed;</span>
+<span class="fc" id="L35">    }</span>
+
+    private boolean containsCorruptedEncoding(String text) {
+<span class="pc bpc" id="L38" title="1 of 2 branches missed.">        if (text == null) return false;</span>
+<span class="pc bpc" id="L39" title="1 of 2 branches missed.">        if (text.contains(&quot;\uFFFD&quot;)) return true;</span>
+<span class="fc bfc" id="L40" title="All 2 branches covered.">        for (char c : text.toCharArray()) {</span>
+            // Standart HTTP loglarindaki bozuk binary/non-utf-8 baytlari yakalar
+<span class="pc bpc" id="L42" title="25 of 26 branches missed.">            if (c &gt; 127 &amp;&amp; c != 'ğ' &amp;&amp; c != 'Ğ' &amp;&amp; c != 'ü' &amp;&amp; c != 'Ü' &amp;&amp; c != 'ş' &amp;&amp; c != 'Ş' </span>
+                    &amp;&amp; c != 'ı' &amp;&amp; c != 'İ' &amp;&amp; c != 'ö' &amp;&amp; c != 'Ö' &amp;&amp; c != 'ç' &amp;&amp; c != 'Ç') {
+<span class="nc" id="L44">                return true;</span>
+            }
+        }
+<span class="fc" id="L47">        return false;</span>
+    }
 
     @Override
     public void process(String input, Emitter&lt;LogRecord&gt; emitter) {
-<span class="pc bpc" id="L37" title="1 of 4 branches missed.">        if (input == null || input.isBlank()) {</span>
-<span class="fc" id="L38">            malformedCount++;</span>
-<span class="pc bpc" id="L39" title="1 of 2 branches missed.">            if (throwOnMalformed) {</span>
-<span class="nc" id="L40">                throw new StageException(&quot;Bos veya tanimsiz log satiri.&quot;);</span>
+<span class="pc bpc" id="L52" title="1 of 4 branches missed.">        if (input == null || input.isBlank()) {</span>
+<span class="fc" id="L53">            malformedCount++;</span>
+<span class="pc bpc" id="L54" title="1 of 2 branches missed.">            if (throwOnMalformed) {</span>
+<span class="nc" id="L55">                throw new StageException(&quot;Bos veya tanimsiz log satiri.&quot;);</span>
             }
-<span class="fc" id="L42">            return;</span>
+<span class="fc" id="L57">            return;</span>
         }
 
-<span class="fc" id="L45">        Matcher matcher = CLF_PATTERN.matcher(input.trim());</span>
-<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (!matcher.matches()) {</span>
-<span class="fc" id="L47">            malformedCount++;</span>
-<span class="fc bfc" id="L48" title="All 2 branches covered.">            if (throwOnMalformed) {</span>
-<span class="fc" id="L49">                throw new StageException(&quot;CLF formatina uymayan log satiri: &quot; + input);</span>
+<span class="pc bpc" id="L60" title="1 of 2 branches missed.">        if (input.length() &gt; MAX_LINE_LENGTH) {</span>
+<span class="nc" id="L61">            malformedCount++;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">            if (throwOnMalformed) {</span>
+<span class="nc" id="L63">                throw new StageException(&quot;Satir boyutu izin verilen siniri asti (&quot; + input.length() + &quot; &gt; &quot; + MAX_LINE_LENGTH + &quot;)&quot;);</span>
             }
-<span class="fc" id="L51">            return;</span>
+<span class="nc" id="L65">            return;</span>
+        }
+
+<span class="pc bpc" id="L68" title="1 of 2 branches missed.">        if (containsCorruptedEncoding(input)) {</span>
+<span class="nc" id="L69">            malformedCount++;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (throwOnMalformed) {</span>
+<span class="nc" id="L71">                throw new StageException(&quot;Gecersiz veya bozuk karakter kodlamasi iceren satir.&quot;);</span>
+            }
+<span class="nc" id="L73">            return;</span>
+        }
+
+<span class="fc" id="L76">        Matcher matcher = CLF_PATTERN.matcher(input.trim());</span>
+<span class="fc bfc" id="L77" title="All 2 branches covered.">        if (!matcher.matches()) {</span>
+<span class="fc" id="L78">            malformedCount++;</span>
+<span class="fc bfc" id="L79" title="All 2 branches covered.">            if (throwOnMalformed) {</span>
+<span class="fc" id="L80">                throw new StageException(&quot;CLF formatina uymayan log satiri: &quot; + input);</span>
+            }
+<span class="fc" id="L82">            return;</span>
         }
 
         try {
-<span class="fc" id="L55">            String clientIp = matcher.group(1);</span>
-<span class="fc" id="L56">            Instant timestamp = Instant.from(DATE_FORMATTER.parse(matcher.group(2)));</span>
-<span class="fc" id="L57">            String method = matcher.group(3);</span>
-<span class="pc bpc" id="L58" title="1 of 2 branches missed.">            String path = matcher.group(4) != null ? matcher.group(4) : &quot;&quot;;</span>
-<span class="fc" id="L59">            int status = Integer.parseInt(matcher.group(6));</span>
-<span class="pc bpc" id="L60" title="1 of 2 branches missed.">            long bytes = &quot;-&quot;.equals(matcher.group(7)) ? 0L : Long.parseLong(matcher.group(7));</span>
-<span class="fc bfc" id="L61" title="All 2 branches covered.">            String userAgent = matcher.group(9) != null ? matcher.group(9) : &quot;&quot;;</span>
+<span class="fc" id="L86">            String clientIp = matcher.group(1);</span>
+<span class="fc" id="L87">            Instant timestamp = Instant.from(DATE_FORMATTER.parse(matcher.group(2)));</span>
+<span class="fc" id="L88">            String method = matcher.group(3);</span>
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">            String path = matcher.group(4) != null ? matcher.group(4) : &quot;&quot;;</span>
+<span class="fc" id="L90">            int status = Integer.parseInt(matcher.group(6));</span>
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            long bytes = &quot;-&quot;.equals(matcher.group(7)) ? 0L : Long.parseLong(matcher.group(7));</span>
+<span class="fc bfc" id="L92" title="All 2 branches covered.">            String userAgent = matcher.group(9) != null ? matcher.group(9) : &quot;&quot;;</span>
 
-<span class="fc" id="L63">            LogRecord record = new LogRecord(timestamp, clientIp, method, path, status, bytes, userAgent, Collections.emptyMap(), input);</span>
-<span class="fc" id="L64">            emitter.emit(record);</span>
-<span class="nc" id="L65">        } catch (StageException se) {</span>
-<span class="nc" id="L66">            throw se;</span>
-<span class="nc" id="L67">        } catch (Exception e) {</span>
-<span class="nc" id="L68">            malformedCount++;</span>
-<span class="nc bnc" id="L69" title="All 2 branches missed.">            if (throwOnMalformed) {</span>
-<span class="nc" id="L70">                throw new StageException(&quot;Ayristirma hatasi: &quot; + e.getMessage(), e);</span>
+<span class="fc" id="L94">            LogRecord record = new LogRecord(timestamp, clientIp, method, path, status, bytes, userAgent, Collections.emptyMap(), input);</span>
+<span class="fc" id="L95">            emitter.emit(record);</span>
+<span class="nc" id="L96">        } catch (StageException se) {</span>
+<span class="nc" id="L97">            throw se;</span>
+<span class="nc" id="L98">        } catch (Exception e) {</span>
+<span class="nc" id="L99">            malformedCount++;</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (throwOnMalformed) {</span>
+<span class="nc" id="L101">                throw new StageException(&quot;Ayristirma hatasi: &quot; + e.getMessage(), e);</span>
             }
-<span class="fc" id="L72">        }</span>
-<span class="fc" id="L73">    }</span>
+<span class="fc" id="L103">        }</span>
+<span class="fc" id="L104">    }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

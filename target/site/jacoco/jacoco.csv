@@ -1,5 +1,5 @@
 GROUP,PACKAGE,CLASS,INSTRUCTION_MISSED,INSTRUCTION_COVERED,BRANCH_MISSED,BRANCH_COVERED,LINE_MISSED,LINE_COVERED,COMPLEXITY_MISSED,COMPLEXITY_COVERED,METHOD_MISSED,METHOD_COVERED
-logflow,logflow.pipeline,ParserStage,41,131,6,12,10,29,6,9,1,5
+logflow,logflow.pipeline,ParserStage,115,167,39,19,19,36,25,11,1,6
 logflow,logflow.pipeline,ValidationStage,62,109,15,17,8,25,15,4,0,3
 logflow,logflow.pipeline,PredicateFilterStage,0,17,1,3,0,6,1,3,0,2
 logflow,logflow.pipeline,ProjectionStage,19,42,7,3,6,10,7,4,0,3

@@ -15,6 +15,8 @@ public class ParserStage implements PipelineStage<String, LogRecord> {
     private static final Pattern CLF_PATTERN = Pattern.compile(CLF_REGEX);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MMM/yyyy:HH:mm:ss Z", Locale.ENGLISH);
 
+    private static final int MAX_LINE_LENGTH = 16384;
+
     private long malformedCount = 0;
     private boolean throwOnMalformed = false;
 
@@ -32,12 +34,41 @@ public class ParserStage implements PipelineStage<String, LogRecord> {
         this.throwOnMalformed = throwOnMalformed;
     }
 
+    private boolean containsCorruptedEncoding(String text) {
+        if (text == null) return false;
+        if (text.contains("\uFFFD")) return true;
+        for (char c : text.toCharArray()) {
+            // Standart HTTP loglarindaki bozuk binary/non-utf-8 baytlari yakalar
+            if (c > 127 && c != 'ğ' && c != 'Ğ' && c != 'ü' && c != 'Ü' && c != 'ş' && c != 'Ş' 
+                    && c != 'ı' && c != 'İ' && c != 'ö' && c != 'Ö' && c != 'ç' && c != 'Ç') {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public void process(String input, Emitter<LogRecord> emitter) {
         if (input == null || input.isBlank()) {
             malformedCount++;
             if (throwOnMalformed) {
                 throw new StageException("Bos veya tanimsiz log satiri.");
+            }
+            return;
+        }
+
+        if (input.length() > MAX_LINE_LENGTH) {
+            malformedCount++;
+            if (throwOnMalformed) {
+                throw new StageException("Satir boyutu izin verilen siniri asti (" + input.length() + " > " + MAX_LINE_LENGTH + ")");
+            }
+            return;
+        }
+
+        if (containsCorruptedEncoding(input)) {
+            malformedCount++;
+            if (throwOnMalformed) {
+                throw new StageException("Gecersiz veya bozuk karakter kodlamasi iceren satir.");
             }
             return;
         }
